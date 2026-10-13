@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables and secrets
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Uploads & temporary storage
+uploads/
+tmp/
+*.log
+
+# Testing & coverage
+coverage/
+
+# Reference repository (kept separate from ace_forge)
+ace-web/
+ace_web/
+
+# OS and Editor metadata
+.DS_Store
+*.pem
+.vscode/
+.idea/
