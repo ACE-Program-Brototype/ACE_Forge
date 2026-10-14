@@ -285,7 +285,7 @@ async function main() {
               "Consider Redis-backed token bucket for multi-node distributed environments",
               "Expose Prometheus metrics for rate limit drop rates",
             ],
-            aiModel: "claude-3-5-sonnet-20241022",
+            aiModel: "gemini-flash-latest",
             repoSnapshot: {
               stars: 2,
               forks: 0,

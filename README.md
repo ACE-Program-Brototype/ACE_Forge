@@ -32,7 +32,7 @@ The system adopts the visual styling, typography, and palette of the `ace-web` r
   - Typography: Serif headlines (`Playfair Display`, `Georgia`), Sans body (`Inter`, `Geist`)
 - **Authentication**: Secure HTTP-only JWT sessions (`jose`), salted `bcryptjs` password hashing, in-memory rate limiting, and route protection middleware.
 - **Email Service**: Nodemailer integration with dev mode (`EMAIL_DEV_MODE=true` logs to console and database table `EmailLog`) and SMTP production delivery.
-- **AI Code Review**: Anthropic Claude API (`claude-3-5-sonnet-20241022`) with structured JSON schema evaluation and heuristic fallback engine.
+- **AI Code Review**: Google Gemini API (`gemini-flash-latest`) with structured JSON schema evaluation, Anthropic Claude fallback support, and an offline heuristic engine.
 - **GitHub Integration**: GitHub REST API client fetching repository metadata, commit histories, file tree structure, and key source code files with size limits.
 
 ---
@@ -54,7 +54,9 @@ The system adopts the visual styling, typography, and palette of the `ace-web` r
 | `SMTP_USER` | SMTP username | `username` | In production |
 | `SMTP_PASS` | SMTP password | `password` | In production |
 | `EMAIL_FROM` | Sender display name and address | `ACE Forge <noreply@aceprogram.org>` | Yes |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key for AI code review | `sk-ant-...` | Optional (falls back to heuristic engine) |
+| `GEMINI_API_KEY` | Google Gemini API key / token for AI code review | `AIzaSy...` | Optional (falls back to heuristic engine) |
+| `GEMINI_MODEL` | Google Gemini model name | `gemini-flash-latest` | No |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key (optional legacy fallback) | `sk-ant-...` | Optional |
 | `ANTHROPIC_MODEL` | Anthropic Claude model name | `claude-3-5-sonnet-20241022` | No |
 | `GITHUB_TOKEN` | Optional GitHub Personal Access Token (for higher rate limits) | `ghp_...` | Optional |
 
@@ -163,4 +165,5 @@ npm run build
 3. **Idempotent Automation**:
    - Reminders record timestamps on the `StudentTask` table to prevent duplicate emails across multiple cron runs.
 4. **Heuristic AI Fallback**:
-   - When an Anthropic API key is not supplied, the platform falls back to a structural heuristic engine that inspects commits, README existence, and repo accessibility, enabling fully offline evaluation and automated testing.
+   - When a Gemini (or Anthropic) API key is not supplied, the platform falls back to a structural heuristic engine that inspects commits, README existence, and repo accessibility, enabling fully offline evaluation and automated testing.
+

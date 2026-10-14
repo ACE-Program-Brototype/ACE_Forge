@@ -17,6 +17,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().default(""),
   SMTP_PASS: z.string().default(""),
   EMAIL_FROM: z.string().default("ACE Forge <noreply@aceprogram.org>"),
+  GEMINI_API_KEY: z.string().optional().default(""),
+  GEMINI_MODEL: z.string().default("gemini-flash-latest"),
   ANTHROPIC_API_KEY: z.string().optional().default(""),
   ANTHROPIC_MODEL: z.string().default("claude-3-5-sonnet-20241022"),
   GITHUB_TOKEN: z.string().optional().default(""),
@@ -36,6 +38,11 @@ export const env = envSchema.parse({
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   EMAIL_FROM: process.env.EMAIL_FROM,
+  GEMINI_API_KEY:
+    process.env.GEMINI_API_KEY ||
+    process.env.GEMINI_TOKEN ||
+    process.env.Gemini_token,
+  GEMINI_MODEL: process.env.GEMINI_MODEL,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,

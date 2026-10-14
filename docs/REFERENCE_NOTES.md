@@ -55,7 +55,7 @@ Because `ace-web` lacks backend, database, authentication, background workers, a
 | **Validation** | None | **Zod** | Runtime schema validation on every client form, server action, and API route. |
 | **Email Service** | None | **Nodemailer** | SMTP integration with support for console logging dev mode (`EMAIL_DEV_MODE=true`). |
 | **Scheduled Tasks** | None | **node-cron + scheduler daemon / route** | Idempotent automated processing for day-6 student reminders and task overdue transitions. |
-| **AI Evaluation** | None | **Anthropic Claude API** | Structured JSON schema output evaluating report clarity, task alignment, and code originality. |
+| **AI Evaluation** | None | **Google Gemini API** | Structured JSON schema output evaluating report clarity, task alignment, and code originality. |
 | **Code Inspection** | None | **GitHub REST API Client** | Fetches commit history, author distributions, file trees, and key source files. |
 
 ---
