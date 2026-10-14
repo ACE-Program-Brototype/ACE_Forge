@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { parseGitHubUrl, GitHubRepoSnapshot } from "../src/services/github.service";
-import { parseAiJsonResponse, generateHeuristicEvaluation } from "../src/services/ai-review.service";
+import {
+  parseAiJsonResponse,
+  generateHeuristicEvaluation,
+  callGeminiApi,
+} from "../src/services/ai-review.service";
 
 describe("GitHub Integration & AI Review Service", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe("GitHub URL Parsing", () => {
     it("should correctly extract owner and repo from standard GitHub URL", () => {
       const res = parseGitHubUrl("https://github.com/diya-patel/rate-limited-proxy");
@@ -66,6 +74,73 @@ describe("GitHub Integration & AI Review Service", () => {
     it("should return null for invalid or incomplete JSON", () => {
       expect(parseAiJsonResponse("Not a json at all")).toBeNull();
       expect(parseAiJsonResponse('{"partial": "json"')).toBeNull();
+    });
+  });
+
+  describe("Google Gemini API Integration", () => {
+    it("should send prompt to Gemini endpoint with JSON generationConfig and parse candidates", async () => {
+      const mockGeminiResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    marks: 91,
+                    comments: "Exemplary implementation and deep technical report.",
+                    strengths: ["Idiomatic concurrent routines", "Clear commit log"],
+                    improvements: ["Document edge cases in README"],
+                    aiGeneratedLikelihood: "low",
+                    reasoning: "Handcrafted idiomatic logic.",
+                    taskAlignment: "high",
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockGeminiResponse,
+      } as Response);
+
+      const result = await callGeminiApi(
+        "Evaluate report submission",
+        "gemini-flash-latest",
+        "test-gemini-key-123"
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, options] = fetchSpy.mock.calls[0];
+      expect(String(url)).toContain("models/gemini-flash-latest:generateContent?key=test-gemini-key-123");
+      expect(options?.method).toBe("POST");
+
+      const parsedBody = JSON.parse(options?.body as string);
+      expect(parsedBody.generationConfig.responseMimeType).toBe("application/json");
+      expect(parsedBody.systemInstruction.parts[0].text).toContain("senior principal engineer");
+
+      expect(result).not.toBeNull();
+      expect(result?.marks).toBe(91);
+      expect(result?.aiGeneratedLikelihood).toBe("low");
+      expect(result?.strengths).toContain("Idiomatic concurrent routines");
+    });
+
+    it("should return null when Gemini API responds with HTTP error", async () => {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => "API key expired or invalid",
+      } as Response);
+
+      const result = await callGeminiApi(
+        "Evaluate report",
+        "gemini-flash-latest",
+        "invalid-key"
+      );
+
+      expect(result).toBeNull();
     });
   });
 
