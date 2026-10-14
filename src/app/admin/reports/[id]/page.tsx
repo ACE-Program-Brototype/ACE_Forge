@@ -295,7 +295,7 @@ export default function ReportDetailPage({
                     AI Code & Integrity Review
                   </h3>
                   <span className="text-[11px] text-muted">
-                    Model: {aiFeedback?.aiModel || "Claude 3.5 Sonnet"}
+                    Model: {aiFeedback?.aiModel || "Gemini Flash"}
                   </span>
                 </div>
               </div>

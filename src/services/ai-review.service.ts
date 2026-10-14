@@ -133,9 +133,77 @@ export function generateHeuristicEvaluation(
 }
 
 /**
- * Calls Anthropic API with structured prompt.
+ * Calls Google Gemini API with structured prompt and JSON response format.
  */
-async function callAnthropicApi(
+export async function callGeminiApi(
+  prompt: string,
+  modelName: string = "gemini-flash-latest",
+  apiKey: string
+): Promise<AiEvaluationResult | null> {
+  const systemInstruction = `You are a strict, senior principal engineer and evaluator for ACE (Advanced Computing Engineers).
+You evaluate student code submissions and reports against rigorous industry standards.
+You must return STRICT JSON ONLY matching this exact format:
+{
+  "marks": <integer between 0 and 100>,
+  "comments": "<2-3 sentence overview of implementation, architecture, and code quality>",
+  "strengths": ["<strength 1>", "<strength 2>"],
+  "improvements": ["<improvement 1>", "<improvement 2>"],
+  "aiGeneratedLikelihood": "low" | "medium" | "high",
+  "reasoning": "<1-2 sentences on whether the code/report shows signs of raw copy-pasted LLM output or authentic organic programming>",
+  "taskAlignment": "high" | "medium" | "low"
+}
+Do not include any conversational preamble or markdown backticks outside the JSON.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`Google Gemini API call failed (HTTP ${res.status}):`, errorText);
+      return null;
+    }
+
+    const data = await res.json();
+    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textContent) {
+      console.warn("Google Gemini API returned empty content candidate.");
+      return null;
+    }
+
+    return parseAiJsonResponse(textContent);
+  } catch (err) {
+    console.error("Network or execution failure calling Google Gemini API:", err);
+    return null;
+  }
+}
+
+/**
+ * Calls Anthropic API with structured prompt (optional fallback).
+ */
+export async function callAnthropicApi(
   prompt: string,
   modelName: string,
   apiKey: string
@@ -186,7 +254,7 @@ Do not include any conversational preamble or markdown backticks outside the JSO
 /**
  * Execute AI review pipeline for a submitted report:
  * 1. Fetch GitHub repo snapshot
- * 2. Send structured prompt to Anthropic API (or heuristic fallback)
+ * 2. Send structured prompt to Google Gemini API (or fallback)
  * 3. Store Feedback row (type=AI) with repoSnapshot and aiModel
  * 4. Update Report.status to AI_REVIEWED
  */
@@ -209,13 +277,21 @@ export async function triggerAsyncAiReview(reportId: string): Promise<void> {
     console.log(`🔍 [AI REVIEW] Inspecting GitHub repo: ${report.githubRepoUrl}...`);
     const snapshot = await fetchGitHubRepoSnapshot(report.githubRepoUrl);
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    const modelName = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
+    const geminiKey = (
+      process.env.GEMINI_API_KEY ||
+      process.env.GEMINI_TOKEN ||
+      process.env.Gemini_token ||
+      ""
+    ).trim();
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-flash-latest";
+
+    const anthropicKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+    const anthropicModel = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
 
     let evaluation: AiEvaluationResult | null = null;
+    let activeAiModel = geminiModel;
 
-    if (apiKey) {
-      const prompt = `Evaluate the following engineering submission:
+    const prompt = `Evaluate the following engineering submission:
 TASK:
 Title: ${report.task.title}
 Requirements: ${report.task.description}
@@ -239,12 +315,20 @@ ${(snapshot.keyFileSamples || []).map((f) => `--- File: ${f.path} ---\n${f.conte
 
 Evaluate if the code satisfies the task, check code quality and architecture, verify commit authenticity, and identify if the work appears AI-generated or copied. Return strict JSON.`;
 
-      evaluation = await callAnthropicApi(prompt, modelName, apiKey);
+    if (geminiKey) {
+      console.log(`🤖 [AI REVIEW] Evaluating with Google Gemini (${geminiModel})...`);
+      activeAiModel = geminiModel;
+      evaluation = await callGeminiApi(prompt, geminiModel, geminiKey);
+    } else if (anthropicKey) {
+      console.log(`🤖 [AI REVIEW] Evaluating with Anthropic Claude (${anthropicModel})...`);
+      activeAiModel = anthropicModel;
+      evaluation = await callAnthropicApi(prompt, anthropicModel, anthropicKey);
     }
 
     // If API unavailable or unconfigured, use heuristic analysis
     if (!evaluation) {
       console.log(`ℹ️ [AI REVIEW] Using structured heuristic evaluation engine.`);
+      activeAiModel = `${geminiModel} (heuristic)`;
       evaluation = generateHeuristicEvaluation(
         report.task.title,
         report.title,
@@ -266,7 +350,7 @@ Evaluate if the code satisfies the task, check code quality and architecture, ve
         comments: evaluation.comments,
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
-        aiModel: modelName,
+        aiModel: activeAiModel,
         repoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
       },
       create: {
@@ -278,7 +362,7 @@ Evaluate if the code satisfies the task, check code quality and architecture, ve
         comments: evaluation.comments,
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
-        aiModel: modelName,
+        aiModel: activeAiModel,
         repoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
       },
     });
