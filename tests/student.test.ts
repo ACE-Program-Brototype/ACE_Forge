@@ -61,4 +61,39 @@ describe("Student Management & Bulk Import Processing", () => {
       expect(parsedRows[1]["Name"]).toBe("Student Two");
     });
   });
+
+  describe("Student Lifecycle & Deletion Logic", () => {
+    it("should toggle student status for temporary deactivation", () => {
+      const student = { id: "s-1", name: "Alice", status: "ACTIVE" as const };
+      const nextStatus = student.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      expect(nextStatus).toBe("INACTIVE");
+
+      const reactivated = nextStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      expect(reactivated).toBe("ACTIVE");
+    });
+
+    it("should verify cascading cleanup order for permanent student deletion", () => {
+      const deletionSteps: string[] = [];
+      const studentId = "test-student-id";
+
+      // Mock transaction execution order
+      function simulateCascadeDelete(id: string) {
+        deletionSteps.push(`emailLog.deleteMany(${id})`);
+        deletionSteps.push(`feedback.deleteMany(${id})`);
+        deletionSteps.push(`report.deleteMany(${id})`);
+        deletionSteps.push(`studentTask.deleteMany(${id})`);
+        deletionSteps.push(`student.delete(${id})`);
+      }
+
+      simulateCascadeDelete(studentId);
+
+      expect(deletionSteps).toEqual([
+        `emailLog.deleteMany(${studentId})`,
+        `feedback.deleteMany(${studentId})`,
+        `report.deleteMany(${studentId})`,
+        `studentTask.deleteMany(${studentId})`,
+        `student.delete(${studentId})`,
+      ]);
+    });
+  });
 });

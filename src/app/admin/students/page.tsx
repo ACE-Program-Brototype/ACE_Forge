@@ -14,6 +14,7 @@ import {
   RiCheckLine,
   RiArrowRightLine,
   RiAlertLine,
+  RiDeleteBinLine,
 } from "react-icons/ri";
 
 interface StudentListItem {
@@ -226,6 +227,53 @@ export default function StudentsPage() {
     }
   };
 
+  const handleDeleteStudent = async (s: StudentListItem) => {
+    const confirmed = confirm(
+      `⚠️ PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete "${s.name}"?\n\nThis will completely delete:\n• Student profile and credentials\n• All assigned tasks and deadlines\n• All weekly reports and GitHub submissions\n• All AI code evaluations and faculty marks\n• All email logs\n\nThis action CANNOT be undone. Proceed?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/students/${s.id}?permanent=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || "Failed to delete student.");
+        return;
+      }
+      setSuccessNotice(data.message || `Student "${s.name}" and all records permanently deleted.`);
+      fetchStudents();
+    } catch {
+      alert("Network error deleting student.");
+    }
+  };
+
+  const handleDeactivateToggle = async (s: StudentListItem) => {
+    const nextStatus = s.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    const confirmed = confirm(
+      `Are you sure you want to ${nextStatus === "INACTIVE" ? "deactivate" : "activate"} "${s.name}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/students/${s.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || "Failed to update status.");
+        return;
+      }
+      setSuccessNotice(`Student "${s.name}" marked as ${nextStatus}.`);
+      fetchStudents();
+    } catch {
+      alert("Network error updating status.");
+    }
+  };
+
   return (
     <AdminLayout>
       {/* Header */}
@@ -410,13 +458,33 @@ export default function StudentsPage() {
                       {s._count?.studentTasks || 0} Tasks Assigned · {s._count?.reports || 0} Reports
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link
-                        href={`/admin/students/${s.id}`}
-                        className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1 hover:border-primary"
-                      >
-                        <span>View Profile</span>
-                        <RiArrowRightLine />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/admin/students/${s.id}`}
+                          className="btn-secondary text-xs py-1 px-2.5 inline-flex items-center gap-1 hover:border-primary"
+                        >
+                          <span>View</span>
+                          <RiArrowRightLine className="text-xs" />
+                        </Link>
+                        <button
+                          onClick={() => handleDeactivateToggle(s)}
+                          className={`py-1 px-2.5 rounded border text-xs transition-colors font-medium ${
+                            s.status === "ACTIVE"
+                              ? "border-outline-variant text-secondary hover:text-amber-700 hover:border-amber-400 bg-white"
+                              : "border-green-200 text-green-700 hover:border-green-400 bg-green-50"
+                          }`}
+                          title={s.status === "ACTIVE" ? "Deactivate Student" : "Re-activate Student"}
+                        >
+                          {s.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStudent(s)}
+                          className="p-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors"
+                          title="Permanently Delete Student and All Records"
+                        >
+                          <RiDeleteBinLine className="text-sm" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
