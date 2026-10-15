@@ -142,6 +142,52 @@ describe("GitHub Integration & AI Review Service", () => {
 
       expect(result).toBeNull();
     });
+
+    it("should retry on 503 spike and succeed on subsequent attempt", async () => {
+      const mockGeminiResponse = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    marks: 85,
+                    comments: "Good code structure.",
+                    strengths: ["Clean code"],
+                    improvements: ["More tests"],
+                    aiGeneratedLikelihood: "low",
+                    reasoning: "Original logic.",
+                    taskAlignment: "high",
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const fetchSpy = vi
+        .spyOn(global, "fetch")
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          text: async () => "Model overloaded",
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockGeminiResponse,
+        } as Response);
+
+      const result = await callGeminiApi(
+        "Evaluate report submission",
+        "gemini-flash-latest",
+        "test-gemini-key"
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(result).not.toBeNull();
+      expect(result?.marks).toBe(85);
+    });
   });
 
   describe("Heuristic Evaluator", () => {
