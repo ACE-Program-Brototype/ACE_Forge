@@ -105,9 +105,9 @@ export default function StudentTaskDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentTaskId: task.id,
-          title,
-          description,
-          githubRepoUrl,
+          title: title.trim(),
+          description: description.trim(),
+          githubRepoUrl: githubRepoUrl.trim(),
           aiDeclarationAccepted: true,
         }),
       });

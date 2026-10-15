@@ -14,6 +14,26 @@ describe("Report Submission Rules & AI Declaration", () => {
     expect(valid.success).toBe(true);
   });
 
+  it("should accept GitHub repository URLs with .git extension, subpaths, and query strings", () => {
+    const urls = [
+      "https://github.com/diya-patel/raft-consensus.git",
+      "https://github.com/diya-patel/raft-consensus/tree/main",
+      "https://github.com/diya-patel/raft-consensus?tab=readme-ov-file",
+      "https://github.com/diya-patel/raft-consensus/",
+    ];
+
+    for (const url of urls) {
+      const parsed = reportSubmissionSchema.safeParse({
+        studentTaskId: "st-12345",
+        title: "Raft Leader Election in Go",
+        description: "Implemented non-blocking RPC election timers with heartbeat ticks and unit tests for network partition edge cases.",
+        githubRepoUrl: url,
+        aiDeclarationAccepted: true,
+      });
+      expect(parsed.success, `Expected URL "${url}" to be valid`).toBe(true);
+    }
+  });
+
   it("should strictly reject report if AI declaration is false or omitted", () => {
     const invalid = reportSubmissionSchema.safeParse({
       studentTaskId: "st-12345",

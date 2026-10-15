@@ -48,6 +48,8 @@ interface FeedbackItem {
     }>;
     fileTreeSummary?: string[];
     aiGeneratedLikelihood?: string;
+    reasoning?: string;
+    taskAlignment?: string;
   } | null;
 }
 
@@ -328,9 +330,10 @@ export default function ReportDetailPage({
                       AI Generation Likelihood: {snapshot.aiGeneratedLikelihood.toUpperCase()}
                     </div>
                     <span>
-                      {snapshot.aiGeneratedLikelihood === "low"
-                        ? "Organic multi-step commit timeline and consistent coding style indicate authentic development."
-                        : "Elevated AI indicators detected. Manual inspection of commit messages and AST patterns recommended."}
+                      {snapshot.reasoning ||
+                        (snapshot.aiGeneratedLikelihood === "low"
+                          ? "Organic multi-step commit timeline and consistent coding style indicate authentic development."
+                          : "Elevated AI indicators detected. Manual inspection of commit messages and AST patterns recommended.")}
                     </span>
                   </div>
                 )}
@@ -343,6 +346,17 @@ export default function ReportDetailPage({
                     {aiFeedback.comments}
                   </p>
                 </div>
+
+                {snapshot?.taskAlignment && (
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-muted mb-1">
+                      Task Alignment
+                    </h5>
+                    <p className="text-xs text-secondary leading-relaxed bg-surface p-3 rounded border border-outline-variant capitalize">
+                      {snapshot.taskAlignment}
+                    </p>
+                  </div>
+                )}
 
                 {aiFeedback.strengths.length > 0 && (
                   <div>

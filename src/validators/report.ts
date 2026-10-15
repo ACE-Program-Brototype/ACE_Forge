@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const githubRepoRegex = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+(\/)?$/;
+export const githubRepoRegex = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+(\/.*|\?.*)?$/;
 
 export const reportSubmissionSchema = z.object({
   studentTaskId: z.string().min(1, "Student task ID is required"),

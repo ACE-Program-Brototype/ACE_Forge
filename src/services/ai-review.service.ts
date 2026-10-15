@@ -157,28 +157,43 @@ Do not include any conversational preamble or markdown backticks outside the JSO
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   try {
-    const res = await fetch(url, {
+    const requestPayload = {
+      systemInstruction: {
+        parts: [{ text: systemInstruction }],
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+      },
+    };
+
+    let res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-        },
-      }),
+      body: JSON.stringify(requestPayload),
     });
+
+    // If 503 (high demand) or 429 (rate limit), retry once after a short backoff
+    if (!res.ok && (res.status === 503 || res.status === 429)) {
+      console.warn(`[GEMINI API] HTTP ${res.status} spike detected. Retrying in 1.5s...`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+    }
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -337,7 +352,14 @@ Evaluate if the code satisfies the task, check code quality and architecture, ve
       );
     }
 
-    // Persist Feedback row
+    // Persist Feedback row with enriched evaluation metadata in repoSnapshot
+    const enrichedSnapshot = {
+      ...snapshot,
+      aiGeneratedLikelihood: evaluation.aiGeneratedLikelihood,
+      reasoning: evaluation.reasoning,
+      taskAlignment: evaluation.taskAlignment,
+    };
+
     await prisma.feedback.upsert({
       where: {
         reportId_type: {
@@ -351,7 +373,7 @@ Evaluate if the code satisfies the task, check code quality and architecture, ve
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
         aiModel: activeAiModel,
-        repoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+        repoSnapshot: enrichedSnapshot as unknown as Prisma.InputJsonValue,
       },
       create: {
         reportId: report.id,
@@ -363,7 +385,7 @@ Evaluate if the code satisfies the task, check code quality and architecture, ve
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
         aiModel: activeAiModel,
-        repoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+        repoSnapshot: enrichedSnapshot as unknown as Prisma.InputJsonValue,
       },
     });
 
