@@ -105,7 +105,7 @@ Please log in and update your credentials immediately upon first access.
 Best regards,
 ACE Engineering Leadership Team`;
 
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: newAdmin.email,
       subject: "Invitation to ACE Forge Admin Portal",
       text: emailBody,
@@ -125,6 +125,8 @@ ACE Engineering Leadership Team`;
       success: true,
       admin: newAdmin,
       temporaryPassword,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
     });
   } catch (error) {
     if (error instanceof AuthError) {
