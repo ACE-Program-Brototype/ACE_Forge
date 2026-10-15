@@ -121,14 +121,90 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin();
     const { id } = await params;
+    const url = new URL(req.url);
+    let permanent = url.searchParams.get("permanent") === "true";
 
-    // Set to INACTIVE instead of cascade deletion to preserve task/grade history
+    if (!permanent) {
+      try {
+        const body = await req.json();
+        if (body?.permanent === true) permanent = true;
+      } catch {
+        // Body is optional for DELETE
+      }
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            studentTasks: true,
+            reports: true,
+            feedbacks: true,
+            emailLogs: true,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      return NextResponse.json({ success: false, error: "Student not found" }, { status: 404 });
+    }
+
+    if (permanent) {
+      // Execute complete cascading deletion inside an atomic transaction
+      await prisma.$transaction(async (tx) => {
+        const studentTasks = await tx.studentTask.findMany({
+          where: { studentId: id },
+          select: { id: true },
+        });
+        const taskIds = studentTasks.map((st) => st.id);
+
+        // 1. Delete EmailLog entries
+        await tx.emailLog.deleteMany({
+          where: {
+            OR: [
+              { studentId: id },
+              { studentTaskId: { in: taskIds } },
+            ],
+          },
+        });
+
+        // 2. Delete Feedback entries (AI and Employee)
+        await tx.feedback.deleteMany({
+          where: { studentId: id },
+        });
+
+        // 3. Delete Report submissions
+        await tx.report.deleteMany({
+          where: { studentId: id },
+        });
+
+        // 4. Delete StudentTask assignments
+        await tx.studentTask.deleteMany({
+          where: { studentId: id },
+        });
+
+        // 5. Delete the Student record itself
+        await tx.student.delete({
+          where: { id },
+        });
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Student "${student.name}" and all associated reports, submissions, feedback, and tasks have been permanently deleted.`,
+        permanent: true,
+      });
+    }
+
+    // Temporary deactivation (preserves task and submission records)
     const deactivated = await prisma.student.update({
       where: { id },
       data: { status: "INACTIVE" },
@@ -138,6 +214,7 @@ export async function DELETE(
       success: true,
       message: "Student account successfully deactivated.",
       student: deactivated,
+      permanent: false,
     });
   } catch (error) {
     if (error instanceof AuthError) {

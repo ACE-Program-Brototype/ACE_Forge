@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminLayout from "@/components/admin/AdminLayout";
 import {
   RiArrowLeftLine,
@@ -18,6 +19,7 @@ import {
   RiRobotLine,
   RiShieldCheckLine,
   RiExternalLinkLine,
+  RiDeleteBinLine,
 } from "react-icons/ri";
 
 interface FeedbackItem {
@@ -96,11 +98,13 @@ export default function StudentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = use(params);
+  const router = useRouter();
   const [student, setStudent] = useState<StudentDetailData | null>(null);
   const [batches, setBatches] = useState<BatchOption[]>([]);
   const [modules, setModules] = useState<ModuleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -213,6 +217,32 @@ export default function StudentDetailPage({
     }
   };
 
+  const handleDeleteStudentPermanent = async () => {
+    if (!student) return;
+    const confirmed = confirm(
+      `⚠️ PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete student "${student.name}"?\n\nThis will permanently erase:\n• Student profile and credentials\n• All assigned tasks and deadlines (${student.studentTasks.length} tasks)\n• All weekly reports and GitHub submissions\n• All AI evaluations and faculty marks\n• All email delivery logs\n\nThis action CANNOT be undone. Proceed?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/admin/students/${student.id}?permanent=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || "Failed to delete student.");
+        setDeleting(false);
+        return;
+      }
+      alert(data.message || `Student "${student.name}" permanently deleted.`);
+      router.push("/admin/students");
+    } catch {
+      alert("Network error while deleting student.");
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -299,7 +329,7 @@ export default function StudentDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
             <button
               onClick={() => {
                 setSaveError(null);
@@ -314,11 +344,20 @@ export default function StudentDetailPage({
               onClick={handleToggleDeactivate}
               className={`btn-secondary text-xs ${
                 student.status === "ACTIVE"
-                  ? "hover:border-red-500 hover:text-red-700"
+                  ? "hover:border-amber-500 hover:text-amber-700"
                   : "hover:border-green-500 hover:text-green-700"
               }`}
             >
               {student.status === "ACTIVE" ? "Deactivate" : "Re-activate"}
+            </button>
+            <button
+              onClick={handleDeleteStudentPermanent}
+              disabled={deleting}
+              className="px-3 py-2 border border-red-200 text-red-700 hover:bg-red-50 hover:border-red-400 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Permanently delete student profile, submissions, feedback, and assigned tasks"
+            >
+              <RiDeleteBinLine className="text-sm" />
+              {deleting ? "Deleting..." : "Delete Permanently"}
             </button>
           </div>
         </div>
