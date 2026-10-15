@@ -84,6 +84,7 @@ export default function StudentsPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Fetch batches & modules for dropdowns
   useEffect(() => {
@@ -164,6 +165,16 @@ export default function StudentsPage() {
         setAddError(data.error || "Failed to enroll student.");
         setAddLoading(false);
         return;
+      }
+
+      if (data.emailSent === false) {
+        setSuccessNotice(
+          `Student ${data.student.name} enrolled! Note: Email delivery failed (${data.emailError || "check SMTP settings"}). Initial temporary password is: ${data.student.phone}`
+        );
+      } else {
+        setSuccessNotice(
+          `Student ${data.student.name} successfully enrolled! Welcome email with initial credentials sent to ${data.student.email} (Password: phone number).`
+        );
       }
 
       setName("");
@@ -250,6 +261,18 @@ export default function StudentsPage() {
           </button>
         </div>
       </div>
+
+      {successNotice && (
+        <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm flex items-center justify-between">
+          <span>{successNotice}</span>
+          <button
+            onClick={() => setSuccessNotice(null)}
+            className="text-green-700 hover:text-green-900 font-bold ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">

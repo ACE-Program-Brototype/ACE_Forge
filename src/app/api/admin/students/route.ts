@@ -124,7 +124,7 @@ Upon your initial login, you will be required to establish a private, strong pas
 Best regards,
 ACE Engineering Program Leadership`;
 
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: student.email,
       studentId: student.id,
       type: EmailType.WELCOME,
@@ -145,7 +145,12 @@ ACE Engineering Program Leadership`;
       </div>`,
     });
 
-    return NextResponse.json({ success: true, student });
+    return NextResponse.json({
+      success: true,
+      student,
+      emailSent: emailResult.success,
+      emailError: emailResult.error,
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
