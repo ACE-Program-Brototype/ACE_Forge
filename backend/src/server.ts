@@ -5,6 +5,8 @@ import cookieParser from "cookie-parser";
 import cron from "node-cron";
 import { env } from "./config/env.js";
 import { prisma, verifyDatabaseConnection } from "./lib/prisma.js";
+import { logger } from "./lib/logger.js";
+import { requestLogger } from "./middleware/request-logger.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { studentRouter } from "./routes/student.routes.js";
@@ -36,9 +38,13 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Cron-Secret", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Cron-Secret", "X-Requested-With", "X-Request-Id"],
+    exposedHeaders: ["X-Request-Id"],
   })
 );
+
+// HTTP Request Logging Middleware (tracks request ID, latency, and response code)
+app.use(requestLogger);
 
 // Parsers
 app.use(cookieParser());
@@ -82,12 +88,12 @@ app.use(errorHandler);
 // In-process Scheduled Job helper
 function setupCronScheduler() {
   cron.schedule("0 * * * *", () => {
-    console.log("⏰ [CRON] Triggering scheduled hourly reminder check...");
+    logger.info("Triggering scheduled hourly reminder check...", { context: "CRON" });
     runRemindersAndOverdueJob().catch((err) => {
-      console.error("❌ [CRON] Hourly reminder job failed:", err);
+      logger.error("Hourly reminder job failed", { error: err instanceof Error ? err.message : String(err), context: "CRON" });
     });
   });
-  console.log("📅 [CRON] Initialized hourly reminder scheduler (0 * * * *).");
+  logger.info("Initialized hourly reminder scheduler (0 * * * *).", { context: "CRON" });
 }
 
 let server: ReturnType<typeof app.listen> | undefined;
@@ -97,44 +103,42 @@ async function startServer() {
     return;
   }
 
-  console.log("==================================================");
-  console.log("⏳ [DATABASE] Verifying PostgreSQL connection before starting server...");
+  logger.info("Verifying PostgreSQL connection before starting server...", { context: "DATABASE" });
 
   try {
     await verifyDatabaseConnection();
-    console.log("✅ [DATABASE] PostgreSQL connected successfully!");
+    logger.info("PostgreSQL connected successfully!", { context: "DATABASE" });
   } catch (dbError) {
-    console.error("❌ ========================================================");
-    console.error("❌ [DATABASE FATAL] Failed to connect to PostgreSQL!");
-    console.error("❌ The backend server will NOT start until this is resolved.");
-    console.error("❌ Error:", dbError instanceof Error ? dbError.message : String(dbError));
-    console.error("❌ Please check:");
-    console.error("   1. Is PostgreSQL running?");
-    console.error("   2. Is DATABASE_URL properly configured in backend/.env?");
-    console.error("==================================================");
+    const errorMsg = dbError instanceof Error ? dbError.message : String(dbError);
+    logger.error("Failed to connect to PostgreSQL. Server will not start.", {
+      error: errorMsg,
+      context: "DATABASE_FATAL",
+    });
     process.exit(1);
   }
 
   // Only listen after confirming database connection
   server = app.listen(env.PORT, () => {
-    console.log(`🚀 ACE Forge Backend API running on port ${env.PORT}`);
-    console.log(`   Environment: ${env.NODE_ENV}`);
-    console.log(`   CORS Origins: ${allowedOrigins.join(", ")}`);
-    console.log(`   Healthcheck: http://localhost:${env.PORT}/health`);
-    console.log("==================================================");
+    logger.info(`ACE Forge Backend API running on port ${env.PORT}`, {
+      port: env.PORT,
+      env: env.NODE_ENV,
+      corsOrigins: allowedOrigins,
+      healthCheck: `http://localhost:${env.PORT}/health`,
+      context: "SERVER",
+    });
   });
 
   // Graceful Shutdown
   const handleShutdown = (signal: string) => {
-    console.log(`\n🛑 Received ${signal}. Gracefully shutting down...`);
+    logger.info(`Received ${signal}. Gracefully shutting down...`, { context: "SERVER" });
     if (server) {
       server.close(async () => {
         try {
           await prisma.$disconnect();
-          console.log("🔌 Prisma disconnected. Process exiting cleanly.");
+          logger.info("Prisma disconnected. Process exiting cleanly.", { context: "SERVER" });
           process.exit(0);
         } catch (err) {
-          console.error("Error disconnecting Prisma:", err);
+          logger.error("Error disconnecting Prisma", { error: err instanceof Error ? err.message : String(err), context: "SERVER" });
           process.exit(1);
         }
       });

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
+import { logger } from "../lib/logger.js";
 import { signAuthToken } from "../lib/jwt.js";
 import { checkRateLimit, resetRateLimit } from "../middleware/rate-limiter.js";
 import {
@@ -37,6 +38,8 @@ authRouter.post("/admin/login", async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: parsed.error.issues[0]?.message || "Validation failed",
+        details: parsed.error.issues,
+        requestId: req.id,
       });
       return;
     }
@@ -46,6 +49,7 @@ authRouter.post("/admin/login", async (req: Request, res: Response) => {
     const rateCheck = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 
     if (!rateCheck.success) {
+      logger.warn(`Admin login rate limited for ${email} from ${ip}`, { email, ip, context: "AUTH" });
       res.status(429).json({
         success: false,
         error: `Too many login attempts. Please try again in ${rateCheck.resetInSeconds} seconds.`,
@@ -58,17 +62,25 @@ authRouter.post("/admin/login", async (req: Request, res: Response) => {
     });
 
     if (!admin || !admin.isActive) {
+      logger.warn(`Admin login failed: inactive or unknown account for ${email}`, { email, ip, context: "AUTH" });
       res.status(401).json({ success: false, error: "Invalid admin credentials" });
       return;
     }
 
     const isValidPassword = await bcrypt.compare(parsed.data.password, admin.passwordHash);
     if (!isValidPassword) {
+      logger.warn(`Admin login failed: invalid password for ${email}`, { email, ip, context: "AUTH" });
       res.status(401).json({ success: false, error: "Invalid admin credentials" });
       return;
     }
 
     resetRateLimit(rateLimitKey);
+    logger.info(`Admin login successful: ${email} (${admin.role})`, {
+      adminId: admin.id,
+      email: admin.email,
+      role: admin.role,
+      context: "AUTH",
+    });
 
     const token = await signAuthToken({
       sub: admin.id,
@@ -115,6 +127,8 @@ authRouter.post("/student/login", async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: parsed.error.issues[0]?.message || "Validation failed",
+        details: parsed.error.issues,
+        requestId: req.id,
       });
       return;
     }
@@ -124,6 +138,7 @@ authRouter.post("/student/login", async (req: Request, res: Response) => {
     const rateCheck = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 
     if (!rateCheck.success) {
+      logger.warn(`Student login rate limited for ${email} from ${ip}`, { email, ip, context: "AUTH" });
       res.status(429).json({
         success: false,
         error: `Too many login attempts. Please try again in ${rateCheck.resetInSeconds} seconds.`,
@@ -136,17 +151,25 @@ authRouter.post("/student/login", async (req: Request, res: Response) => {
     });
 
     if (!student || student.status !== "ACTIVE") {
+      logger.warn(`Student login failed: inactive or unknown account for ${email}`, { email, ip, context: "AUTH" });
       res.status(401).json({ success: false, error: "Invalid email or password" });
       return;
     }
 
     const isValidPassword = await bcrypt.compare(parsed.data.password, student.passwordHash);
     if (!isValidPassword) {
+      logger.warn(`Student login failed: invalid password for ${email}`, { email, ip, context: "AUTH" });
       res.status(401).json({ success: false, error: "Invalid email or password" });
       return;
     }
 
     resetRateLimit(rateLimitKey);
+    logger.info(`Student login successful: ${email}`, {
+      studentId: student.id,
+      email: student.email,
+      mustChangePassword: student.mustChangePassword,
+      context: "AUTH",
+    });
 
     const token = await signAuthToken({
       sub: student.id,
@@ -236,6 +259,12 @@ authRouter.post(
       });
 
       res.cookie(STUDENT_COOKIE_NAME, token, getCookieOptions());
+
+      logger.info(`Student password changed successfully for ${student.email}`, {
+        studentId: student.id,
+        email: student.email,
+        context: "AUTH",
+      });
 
       res.json({
         success: true,
