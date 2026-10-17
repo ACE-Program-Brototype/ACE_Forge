@@ -4,7 +4,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import cron from "node-cron";
 import { env } from "./config/env.js";
-import { prisma } from "./lib/prisma.js";
+import { prisma, verifyDatabaseConnection } from "./lib/prisma.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { studentRouter } from "./routes/student.routes.js";
@@ -79,8 +79,8 @@ app.use("/api/cron", cronRouter);
 // Global Error Handler
 app.use(errorHandler);
 
-// In-process Scheduled Job: Run reminders and overdue checks every hour
-if (env.NODE_ENV !== "test") {
+// In-process Scheduled Job helper
+function setupCronScheduler() {
   cron.schedule("0 * * * *", () => {
     console.log("⏰ [CRON] Triggering scheduled hourly reminder check...");
     runRemindersAndOverdueJob().catch((err) => {
@@ -92,9 +92,31 @@ if (env.NODE_ENV !== "test") {
 
 let server: ReturnType<typeof app.listen> | undefined;
 
-if (env.NODE_ENV !== "test") {
+async function startServer() {
+  if (env.NODE_ENV === "test") {
+    return;
+  }
+
+  console.log("==================================================");
+  console.log("⏳ [DATABASE] Verifying PostgreSQL connection before starting server...");
+
+  try {
+    await verifyDatabaseConnection();
+    console.log("✅ [DATABASE] PostgreSQL connected successfully!");
+  } catch (dbError) {
+    console.error("❌ ========================================================");
+    console.error("❌ [DATABASE FATAL] Failed to connect to PostgreSQL!");
+    console.error("❌ The backend server will NOT start until this is resolved.");
+    console.error("❌ Error:", dbError instanceof Error ? dbError.message : String(dbError));
+    console.error("❌ Please check:");
+    console.error("   1. Is PostgreSQL running?");
+    console.error("   2. Is DATABASE_URL properly configured in backend/.env?");
+    console.error("==================================================");
+    process.exit(1);
+  }
+
+  // Only listen after confirming database connection
   server = app.listen(env.PORT, () => {
-    console.log("==================================================");
     console.log(`🚀 ACE Forge Backend API running on port ${env.PORT}`);
     console.log(`   Environment: ${env.NODE_ENV}`);
     console.log(`   CORS Origins: ${allowedOrigins.join(", ")}`);
@@ -121,7 +143,12 @@ if (env.NODE_ENV !== "test") {
 
   process.on("SIGTERM", () => handleShutdown("SIGTERM"));
   process.on("SIGINT", () => handleShutdown("SIGINT"));
+
+  // Start cron jobs
+  setupCronScheduler();
 }
+
+startServer();
 
 export { app };
 export default app;
