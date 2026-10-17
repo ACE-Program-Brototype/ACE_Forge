@@ -1,12 +1,21 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+import { fileURLToPath } from "url";
 import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Search for .env in backend directory, parent directory (project root), and cwd
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config();
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.string().default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
-  DATABASE_URL: z.string().default("postgresql://localhost:5432/ace_forge?schema=public"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters").default("ace-forge-super-secret-development-jwt-key-2026-very-secure"),
   JWT_EXPIRES_IN: z.string().default("7d"),
   CRON_SECRET: z.string().default("ace-forge-cron-secret-2026"),
@@ -57,3 +66,8 @@ export const env = envSchema.parse({
   ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
 });
+
+// Explicitly ensure process.env.DATABASE_URL is set for Prisma client runtime
+if (!process.env.DATABASE_URL && env.DATABASE_URL) {
+  process.env.DATABASE_URL = env.DATABASE_URL;
+}
