@@ -112,7 +112,7 @@ function ReportsContent() {
   const aiReviewedCount = reports.filter((r) => r.status === "AI_REVIEWED").length;
 
   return (
-    <AdminLayout>
+    <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
@@ -308,20 +308,16 @@ function ReportsContent() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   );
 }
 
 export default function ReportsPage() {
   return (
-    <Suspense
-      fallback={
-        <AdminLayout>
-          <div className="p-12 text-center text-muted text-sm">Loading reports...</div>
-        </AdminLayout>
-      }
-    >
-      <ReportsContent />
-    </Suspense>
+    <AdminLayout>
+      <Suspense fallback={<div className="p-12 text-center text-muted text-sm">Loading reports...</div>}>
+        <ReportsContent />
+      </Suspense>
+    </AdminLayout>
   );
 }
