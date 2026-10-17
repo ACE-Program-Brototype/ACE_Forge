@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthToken, AdminTokenPayload, StudentTokenPayload } from "@/lib/jwt";
-import { ADMIN_COOKIE_NAME, STUDENT_COOKIE_NAME } from "@/lib/auth";
+import { ADMIN_COOKIE_NAME, STUDENT_COOKIE_NAME } from "@/lib/auth-constants";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
