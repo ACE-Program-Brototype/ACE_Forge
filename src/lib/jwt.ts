@@ -1,4 +1,5 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose/jwt/sign";
+import { jwtVerify } from "jose/jwt/verify";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "ace-forge-super-secret-development-jwt-key-2026-very-secure"
