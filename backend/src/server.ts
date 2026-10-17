@@ -90,31 +90,38 @@ if (env.NODE_ENV !== "test") {
   console.log("📅 [CRON] Initialized hourly reminder scheduler (0 * * * *).");
 }
 
-const server = app.listen(env.PORT, () => {
-  console.log("==================================================");
-  console.log(`🚀 ACE Forge Backend API running on port ${env.PORT}`);
-  console.log(`   Environment: ${env.NODE_ENV}`);
-  console.log(`   CORS Origins: ${allowedOrigins.join(", ")}`);
-  console.log(`   Healthcheck: http://localhost:${env.PORT}/health`);
-  console.log("==================================================");
-});
+let server: ReturnType<typeof app.listen> | undefined;
 
-// Graceful Shutdown
-function handleShutdown(signal: string) {
-  console.log(`\n🛑 Received ${signal}. Gracefully shutting down...`);
-  server.close(async () => {
-    try {
-      await prisma.$disconnect();
-      console.log("🔌 Prisma disconnected. Process exiting cleanly.");
-      process.exit(0);
-    } catch (err) {
-      console.error("Error disconnecting Prisma:", err);
-      process.exit(1);
-    }
+if (env.NODE_ENV !== "test") {
+  server = app.listen(env.PORT, () => {
+    console.log("==================================================");
+    console.log(`🚀 ACE Forge Backend API running on port ${env.PORT}`);
+    console.log(`   Environment: ${env.NODE_ENV}`);
+    console.log(`   CORS Origins: ${allowedOrigins.join(", ")}`);
+    console.log(`   Healthcheck: http://localhost:${env.PORT}/health`);
+    console.log("==================================================");
   });
+
+  // Graceful Shutdown
+  const handleShutdown = (signal: string) => {
+    console.log(`\n🛑 Received ${signal}. Gracefully shutting down...`);
+    if (server) {
+      server.close(async () => {
+        try {
+          await prisma.$disconnect();
+          console.log("🔌 Prisma disconnected. Process exiting cleanly.");
+          process.exit(0);
+        } catch (err) {
+          console.error("Error disconnecting Prisma:", err);
+          process.exit(1);
+        }
+      });
+    }
+  };
+
+  process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+  process.on("SIGINT", () => handleShutdown("SIGINT"));
 }
 
-process.on("SIGTERM", () => handleShutdown("SIGTERM"));
-process.on("SIGINT", () => handleShutdown("SIGINT"));
-
+export { app };
 export default app;
