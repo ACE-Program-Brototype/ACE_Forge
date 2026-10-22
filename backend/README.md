@@ -12,6 +12,7 @@
 - **Authentication**: JWT signed via `jose`, stored in `httpOnly` secure cookies (`ace_admin_token`, `ace_student_token`)
 - **Background Worker**: In-process asynchronous job queue (`queue.service.ts`) for non-blocking Gemini AI evaluations upon report submission
 - **Scheduled Cron**: Hourly in-process `node-cron` scheduler + protected HTTP endpoint (`POST /api/cron/reminders` with `Bearer CRON_SECRET`)
+- **Logging & Observability**: Production-grade Winston logger with correlation IDs (`X-Request-Id`), sensitive data redaction, single-line JSON formatting for aggregators, and human-friendly color output in dev
 - **Security & Headers**: Helmet, CORS with strict origin allowlist and `credentials: true`, rate limiting (`express-rate-limit`)
 
 ---
@@ -28,10 +29,12 @@ backend/
 │   ├── config/env.ts           # Zod-validated runtime environment configuration
 │   ├── lib/
 │   │   ├── prisma.ts           # Global PrismaClient singleton
-│   │   └── jwt.ts              # Jose token issuance & verification
+│   │   ├── jwt.ts              # Jose token issuance & verification
+│   │   └── logger.ts           # Winston logger with sensitive redaction
 │   ├── middleware/
 │   │   ├── auth.ts             # requireAdmin & requireStudent guards
-│   │   ├── errorHandler.ts     # Centralized HTTP error handler
+│   │   ├── errorHandler.ts     # Centralized HTTP error handler with request ID
+│   │   ├── request-logger.ts   # HTTP request timing & correlation middleware
 │   │   └── rate-limiter.ts     # Auth and general rate limiters
 │   ├── routes/
 │   │   ├── admin.routes.ts     # Admin CRUD (students, batches, modules, tasks, reports)
@@ -47,7 +50,7 @@ backend/
 │   │   └── task-assignment.service.ts # Module-to-student task auto-assigner
 │   ├── validators/             # Zod input validation schemas
 │   └── server.ts               # Express application entrypoint & server bootstrap
-├── tests/                      # Vitest test suites (10 test suites, 63 unit tests)
+├── tests/                      # Vitest test suites (16 test suites, 119 unit tests)
 ├── .env.example
 ├── package.json
 └── tsconfig.json
@@ -63,6 +66,8 @@ Copy `.env.example` to `.env` in the `backend/` directory:
 |---|---|---|---|
 | `PORT` | HTTP server port | `4000` | No |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/ace_forge` | **Yes** |
+| `LOG_LEVEL` | Minimum log severity level (`error`, `warn`, `info`, `http`, `debug`) | `info` (or `error` during tests) | No |
+| `LOG_FORMAT` | Log format strategy (`json` or `pretty`) | `pretty` in dev, `json` in prod | No |
 | `JWT_SECRET` | Secret key for JWT signing (HS256) | `minimum-32-character-random-secret` | **Yes** |
 | `JWT_EXPIRES_IN` | Token expiration duration | `7d` | No |
 | `CORS_ORIGIN` | Allowed frontend origin(s), comma-separated | `http://localhost:3000,https://app.aceforge.org` | **Yes** |

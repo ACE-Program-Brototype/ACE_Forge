@@ -22,7 +22,10 @@ export async function sendEmail({
   studentTaskId,
   type,
 }: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
-  const isDevMode = env.EMAIL_DEV_MODE || !env.SMTP_USER;
+  const isDevMode =
+    process.env.EMAIL_DEV_MODE === "true" ||
+    env.EMAIL_DEV_MODE ||
+    !env.SMTP_USER;
 
   if (isDevMode) {
     console.log("------------------------------------------------------------");

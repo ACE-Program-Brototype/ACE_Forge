@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { sendEmail } from "./email.service.js";
 import { env } from "../config/env.js";
+import { logger } from "../lib/logger.js";
 import { EmailType, StudentTaskStatus } from "@prisma/client";
 
 export const REMINDER_DAY_OFFSET = 6;
@@ -39,7 +40,10 @@ export function isTaskOverdue(
  * Idempotent reminder and overdue background job runner.
  */
 export async function runRemindersAndOverdueJob(referenceTime: Date = new Date()) {
-  console.log(`⏰ Running reminder and overdue job at ${referenceTime.toISOString()}...`);
+  logger.info(`Running reminder and overdue job at ${referenceTime.toISOString()}...`, {
+    referenceTime: referenceTime.toISOString(),
+    context: "REMINDER_JOB",
+  });
 
   const appUrl = env.APP_BASE_URL || "http://localhost:3000";
 
@@ -115,6 +119,11 @@ ACE Engineering Faculty`;
     }
   }
 
-  console.log(`✅ Reminder & overdue job finished: ${remindersSent} reminders sent, ${overdueMarked} marked overdue.`);
+  logger.info(`Reminder & overdue job finished: ${remindersSent} reminders sent, ${overdueMarked} marked overdue.`, {
+    remindersSent,
+    overdueMarked,
+    totalProcessed: pendingTasks.length,
+    context: "REMINDER_JOB",
+  });
   return { remindersSent, overdueMarked, totalProcessed: pendingTasks.length };
 }

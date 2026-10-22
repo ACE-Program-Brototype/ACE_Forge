@@ -37,6 +37,8 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional().default(""),
   ANTHROPIC_MODEL: z.string().default("claude-3-5-sonnet-20241022"),
   GITHUB_TOKEN: z.string().optional().default(""),
+  LOG_LEVEL: z.enum(["error", "warn", "info", "http", "debug"]).default("info"),
+  LOG_FORMAT: z.enum(["json", "pretty"]).optional(),
 });
 
 export const env = envSchema.parse({
@@ -65,6 +67,8 @@ export const env = envSchema.parse({
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+  LOG_LEVEL: process.env.LOG_LEVEL || (process.env.NODE_ENV === "development" ? "debug" : "info"),
+  LOG_FORMAT: process.env.LOG_FORMAT,
 });
 
 // Explicitly ensure process.env.DATABASE_URL is set for Prisma client runtime

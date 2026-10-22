@@ -1,4 +1,5 @@
 import { triggerAsyncAiReview } from "./ai-review.service.js";
+import { logger } from "../lib/logger.js";
 
 type JobType = "AI_REVIEW";
 
@@ -38,7 +39,11 @@ class BackgroundQueueService {
 
     this.queue.push(job);
     this.jobsMap.set(jobId, job);
-    console.log(`📥 [QUEUE] Enqueued AI Review job: ${jobId} for report ${reportId}`);
+    logger.info(`Enqueued AI Review job: ${jobId} for report ${reportId}`, {
+      jobId,
+      reportId,
+      context: "QUEUE",
+    });
 
     // Trigger processing tick asynchronously
     setImmediate(() => this.processNext());
@@ -62,7 +67,11 @@ class BackgroundQueueService {
     job.attempts += 1;
     job.updatedAt = new Date();
 
-    console.log(`⚙️ [QUEUE] Processing job: ${job.id} (Attempt ${job.attempts}/${job.maxAttempts})...`);
+    logger.info(`Processing job: ${job.id} (Attempt ${job.attempts}/${job.maxAttempts})...`, {
+      jobId: job.id,
+      attempts: job.attempts,
+      context: "QUEUE",
+    });
 
     try {
       if (job.type === "AI_REVIEW") {
@@ -70,14 +79,19 @@ class BackgroundQueueService {
       }
       job.status = "COMPLETED";
       job.updatedAt = new Date();
-      console.log(`✅ [QUEUE] Completed job: ${job.id}`);
+      logger.info(`Completed job: ${job.id}`, { jobId: job.id, context: "QUEUE" });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       job.error = errorMsg;
       job.updatedAt = new Date();
 
       if (job.attempts < job.maxAttempts) {
-        console.warn(`⚠️ [QUEUE] Job ${job.id} failed: ${errorMsg}. Re-queuing in 2s...`);
+        logger.warn(`Job ${job.id} failed: ${errorMsg}. Re-queuing in 2s...`, {
+          jobId: job.id,
+          attempts: job.attempts,
+          error: errorMsg,
+          context: "QUEUE",
+        });
         job.status = "QUEUED";
         setTimeout(() => {
           this.queue.push(job);
@@ -85,7 +99,12 @@ class BackgroundQueueService {
         }, 2000);
       } else {
         job.status = "FAILED";
-        console.error(`❌ [QUEUE] Job ${job.id} permanently failed after ${job.attempts} attempts: ${errorMsg}`);
+        logger.error(`Job ${job.id} permanently failed after ${job.attempts} attempts: ${errorMsg}`, {
+          jobId: job.id,
+          attempts: job.attempts,
+          error: errorMsg,
+          context: "QUEUE",
+        });
       }
     } finally {
       this.isProcessing = false;

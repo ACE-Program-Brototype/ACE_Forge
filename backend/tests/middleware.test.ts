@@ -23,6 +23,7 @@ describe("Middleware Unit Tests (middleware.test.ts)", () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
         error: "Forbidden: Insufficient privileges",
+        requestId: "unknown",
       });
     });
 
@@ -66,6 +67,7 @@ describe("Middleware Unit Tests (middleware.test.ts)", () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
         error: "Database deadlock occurred",
+        requestId: "unknown",
       });
     });
   });
